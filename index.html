@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stardew Gundam</title>
+<style>
+/* ===========================================
+   1. 基础重置 + 字体
+   =========================================== */
+@font-face {
+  font-family: 'Zpix';
+  src: url('https://cdn.jsdelivr.net/npm/zpix@3.1.4/dist/Zpix.woff2') format('woff2');
+  font-display: swap;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+  font-family: 'Zpix', 'Microsoft YaHei', monospace;
+  background: #2d1b0e;
+  cursor: url('assets/cursor_stardew.png') 2 2, auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ===========================================
+   2. CSS 变量
+   =========================================== */
+:root {
+  --brown-dark: #2d1b0e;
+  --brown-mid: #5c3a1e;
+  --border-gold: #e8c170;
+  --highlight: #ffd700;
+  --text-warm: #f5e6d3;
+  --text-dark: #3e2710;
+  --red-alert: #c04040;
+  --slot-empty: rgba(255,255,255,0.12);
+  --slot-filled: rgba(255,215,0,0.45);
+  --overlay-bg: rgba(0,0,0,0.55);
+  --z-bg: 0;
+  --z-npc: 10;
+  --z-indicator: 20;
+  --z-inventory: 50;
+  --z-item: 100;
+  --z-popup: 200;
+  --z-bubble: 300;
+  --z-panel: 400;
+  --z-transition: 500;
+  --z-loading: 600;
+}
+
+/* ===========================================
+   3. 加载画面
+   =========================================== */
+#loading-screen {
+  position: fixed; inset: 0; z-index: var(--z-loading);
+  background: var(--brown-dark);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  transition: opacity 0.5s;
+}
+#loading-screen.fade-out { opacity: 0; pointer-events: none; }
+#loading-screen .load-text {
+  color: var(--border-gold); font-size: 20px;
+  animation: breathe 2s ease-in-out infinite;
+}
+#loading-screen .load-sub {
+  color: var(--text-warm); font-size: 13px; margin-top: 12px; opacity: 0.7;
+}
+
+/* ===========================================
+   4. Stage 通用样式
+   =========================================== */
+.stage {
+  position: fixed; inset: 0; z-index: var(--z-bg);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+.stage.active { opacity: 1; pointer-events: auto; }
+.stage-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  background-color: var(--brown-dark);
+}
+
+/* ===========================================
+   5. Stage 1 — 办公室
+   =========================================== */
+.alert-popup {
+  position: absolute; width: 380px;
+  background: var(--brown-mid);
+  border: 4px solid var(--border-gold);
+  box-shadow: 0 0 0 4px var(--brown-dark), 0 8px 24px rgba(0,0,0,0.6);
+  padding: 0; z-index: var(--z-popup);
+  animation: scalePop 0.3s ease-out;
+}
+.alert-popup .popup-title {
+  background: var(--border-gold); color: var(--text-dark);
+  font-size: 14px; padding: 6px 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.alert-popup .popup-close {
+  width: 24px; height: 24px; background: var(--red-alert);
+  border: 2px solid #801010; color: #fff;
+  font-size: 14px; line-height: 20px; text-align: center;
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+}
+.alert-popup .popup-close:hover { background: #e05050; }
+.alert-popup .popup-body {
+  padding: 16px 14px; color: var(--text-warm); font-size: 14px; line-height: 1.6;
+}
+.alert-popup.shrinking { animation: scaleShrink 0.3s ease-in forwards; }
+
+/* 嫩芽气泡 */
+#sprout-bubble {
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
+  z-index: var(--z-bubble);
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #8fcc5a, #3d7a1c);
+  border: 3px solid #2d5a10;
+  box-shadow: 0 0 24px rgba(140,200,80,0.5), 0 0 60px rgba(140,200,80,0.25);
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+  animation: breathe 2s ease-in-out infinite;
+  display: flex; align-items: center; justify-content: center;
+}
+#sprout-bubble::after {
+  content: '✦'; color: #fff; font-size: 28px;
+  text-shadow: 0 0 8px rgba(255,255,255,0.8);
+}
+#sprout-bubble.hidden { display: none; }
+
+/* ===========================================
+   6. Stage 2 — 四季
+   =========================================== */
+.npc-char {
+  position: absolute; bottom: 75px;
+  height: 15vh; min-height: 100px; max-height: 150px;
+  width: auto; object-fit: contain;
+  z-index: var(--z-npc);
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+  transition: left 0.4s ease;
+}
+.item-hotspot {
+  position: absolute; max-height: 9vh;
+  object-fit: contain; z-index: var(--z-item);
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+  filter: drop-shadow(0 0 6px rgba(255,255,255,0.5));
+  transition: transform 0.15s, filter 0.15s, left 0.3s, top 0.3s;
+}
+.item-hotspot:hover { filter: drop-shadow(0 0 14px var(--highlight)); transform: scale(1.1); }
+.item-hotspot.collected { display: none; }
+.item-hotspot.shake { animation: shake 0.4s ease; }
+
+#season-indicator {
+  position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+  z-index: var(--z-indicator);
+  color: var(--text-warm); font-size: 18px;
+  background: rgba(0,0,0,0.5);
+  padding: 4px 20px; border-radius: 4px;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+#season-indicator .arrow { color: var(--border-gold); margin: 0 6px; }
+
+/* ===========================================
+   7. Stage 3 — 终章
+   =========================================== */
+#final-npc {
+  position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);
+  height: 15vh; min-height: 100px; max-height: 150px;
+  width: auto; object-fit: contain;
+  z-index: var(--z-npc);
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+  transition: filter 0.3s;
+}
+#final-npc.glow-hint {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* "再点我一下？" 气泡 */
+#ending-hint-bubble {
+  position: absolute; left: 50%; top: 18%; transform: translateX(-50%);
+  z-index: var(--z-bubble);
+  background: rgba(0,0,0,0.75); color: var(--border-gold);
+  font-size: 14px; padding: 8px 16px;
+  border: 2px solid var(--border-gold);
+  border-radius: 6px;
+  animation: breathe 3s ease-in-out infinite;
+}
+#ending-hint-bubble::after {
+  content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
+  border: 6px solid transparent; border-top: 6px solid var(--border-gold);
+}
+#ending-hint-bubble.hidden { display: none; }
+
+/* ===========================================
+   8. 物品栏
+   =========================================== */
+#inventory-bar {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  z-index: var(--z-inventory);
+  display: flex; gap: 8px; padding: 10px 20px;
+  background: rgba(0,0,0,0.6);
+  border-top: 3px solid var(--border-gold);
+  border-left: 3px solid var(--border-gold);
+  border-right: 3px solid var(--border-gold);
+  border-radius: 8px 8px 0 0;
+  transition: opacity 0.4s;
+}
+#inventory-bar.hidden { opacity: 0; pointer-events: none; }
+.inv-slot {
+  width: 52px; height: 52px;
+  border: 2px dashed var(--slot-empty);
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  transition: border 0.3s, box-shadow 0.3s, background 0.3s;
+}
+.inv-slot img { max-width: 80%; max-height: 80%; object-fit: contain; }
+.inv-slot.filled {
+  border: 2px solid var(--border-gold);
+  background: var(--slot-filled);
+  box-shadow: 0 0 10px rgba(255,215,0,0.4);
+}
+
+/* ===========================================
+   9. 对话框
+   =========================================== */
+#dialog-overlay {
+  position: fixed; inset: 0; z-index: var(--z-panel);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 100px;
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.25s;
+}
+#dialog-overlay.visible { opacity: 1; pointer-events: auto; }
+#dialog-box {
+  width: 72vw; min-height: 100px;
+  background: var(--brown-mid);
+  border: 5px solid var(--border-gold);
+  box-shadow: 0 0 0 3px var(--brown-dark), 0 10px 30px rgba(0,0,0,0.7);
+  padding: 22px 24px; position: relative;
+  animation: slideUp 0.4s ease-out;
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+}
+#dialog-box::after {
+  content: '▼'; position: absolute; bottom: 6px; right: 14px;
+  color: var(--border-gold); font-size: 12px;
+  animation: breathe 1.5s ease-in-out infinite;
+}
+#dialog-text { color: var(--text-warm); font-size: 16px; line-height: 1.8; min-height: 28px; }
+#dialog-text .typing-cursor::after {
+  content: '▌'; color: var(--highlight); animation: typewriterBlink 0.6s step-end infinite;
+}
+
+/* ===========================================
+   10. 信件面板
+   =========================================== */
+#letter-overlay {
+  position: fixed; inset: 0; z-index: calc(var(--z-panel) + 10);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--overlay-bg);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.4s;
+}
+#letter-overlay.visible { opacity: 1; pointer-events: auto; }
+#letter-panel {
+  width: 620px; max-height: 78vh; overflow-y: auto;
+  background: #f5e6c8;
+  border: 6px solid #c8a050;
+  box-shadow: 0 0 0 3px #6b3a1e, 0 14px 40px rgba(0,0,0,0.6);
+  padding: 40px 36px;
+  color: #3e2710; font-size: 15px; line-height: 2.2;
+  position: relative;
+}
+#letter-panel p { margin-bottom: 14px; }
+#letter-close-btn {
+  display: block; margin: 24px auto 0;
+  background: var(--brown-mid); color: var(--text-warm);
+  border: 3px solid var(--border-gold);
+  font-family: inherit; font-size: 14px;
+  padding: 8px 28px;
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+}
+#letter-close-btn:hover { background: #7a4e28; }
+#letter-panel .letter-signature {
+  text-align: right; margin-top: 20px; color: #8b6914; font-size: 14px;
+}
+
+/* ===========================================
+   11. 社交面板
+   =========================================== */
+#social-overlay {
+  position: fixed; inset: 0; z-index: calc(var(--z-panel) + 10);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--overlay-bg);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.4s;
+}
+#social-overlay.visible { opacity: 1; pointer-events: auto; }
+#social-panel {
+  width: 440px; background: var(--brown-mid);
+  border: 5px solid var(--border-gold);
+  box-shadow: 0 0 0 3px var(--brown-dark), 0 14px 40px rgba(0,0,0,0.6);
+  padding: 28px 30px;
+  color: var(--text-warm);
+}
+#social-panel h3 {
+  text-align: center; font-size: 22px; color: var(--highlight);
+  margin-bottom: 6px;
+}
+#social-panel .social-subtitle { text-align: center; font-size: 13px; opacity: 0.7; margin-bottom: 20px; }
+.skill-row { margin-bottom: 12px; }
+.skill-row .skill-label { font-size: 13px; margin-bottom: 4px; display: flex; justify-content: space-between; }
+.skill-row .skill-bar-outer {
+  height: 12px; background: #1a0e04;
+  border: 2px solid #8b6914;
+}
+.skill-row .skill-bar-inner {
+  height: 100%; background: linear-gradient(to right, #c8a050, var(--highlight));
+  transition: width 1s ease;
+}
+.social-links { display: flex; gap: 16px; justify-content: center; margin-top: 22px; }
+.social-links a {
+  display: inline-block; padding: 8px 18px;
+  background: var(--brown-dark); color: var(--border-gold);
+  border: 2px solid var(--border-gold);
+  font-size: 13px; text-decoration: none;
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.social-links a:hover { background: #4a2a10; transform: translateY(-2px); }
+#social-close-btn {
+  display: block; margin: 20px auto 0;
+  background: transparent; color: var(--text-warm);
+  border: 2px solid var(--border-gold);
+  font-family: inherit; font-size: 13px;
+  padding: 6px 24px;
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+}
+#social-close-btn:hover { background: rgba(255,255,255,0.08); }
+
+/* ===========================================
+   12. 转场遮罩
+   =========================================== */
+#transition-overlay {
+  position: fixed; inset: 0; z-index: var(--z-transition);
+  pointer-events: none; opacity: 0;
+}
+#transition-overlay.white-flash {
+  background: #fff; animation: whiteFlash 0.9s ease-out forwards;
+}
+#transition-overlay.black-fade {
+  background: #000; animation: blackFade 1.6s ease-out forwards;
+}
+
+/* ===========================================
+   13. 存档询问弹窗
+   =========================================== */
+#save-prompt {
+  position: fixed; inset: 0; z-index: calc(var(--z-loading) - 10);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--overlay-bg);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+#save-prompt.visible { opacity: 1; pointer-events: auto; }
+#save-prompt .prompt-box {
+  background: var(--brown-mid); border: 5px solid var(--border-gold);
+  box-shadow: 0 0 0 3px var(--brown-dark), 0 12px 36px rgba(0,0,0,0.6);
+  padding: 30px 34px; text-align: center; max-width: 440px;
+}
+#save-prompt .prompt-box p { color: var(--text-warm); font-size: 15px; line-height: 1.8; margin-bottom: 20px; }
+#save-prompt .prompt-btns { display: flex; gap: 14px; justify-content: center; }
+#save-prompt .prompt-btns button {
+  font-family: inherit; font-size: 14px; padding: 8px 24px;
+  border: 3px solid var(--border-gold);
+  cursor: url('assets/cursor_stardew.png') 2 2, pointer;
+  transition: background 0.2s;
+}
+#save-prompt .btn-continue { background: var(--brown-mid); color: var(--highlight); }
+#save-prompt .btn-continue:hover { background: #7a4e28; }
+#save-prompt .btn-restart { background: transparent; color: var(--text-warm); }
+#save-prompt .btn-restart:hover { background: rgba(255,255,255,0.06); }
+
+/* ===========================================
+   14. 飞行道具（Stage 3 用）
+   =========================================== */
+.flying-item {
+  position: fixed; z-index: 450; pointer-events: none;
+  transition: none;
+}
+
+/* ===========================================
+   15. 动画关键帧
+   =========================================== */
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+@keyframes scalePop {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes scaleShrink {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0); opacity: 0; }
+}
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes typewriterBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes whiteFlash {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes blackFade {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 1; }
+}
+@keyframes pulseGlow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255,215,0,0.3)); }
+  50% { filter: drop-shadow(0 0 18px rgba(255,215,0,0.8)); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+</style>
+</head>
+<body>
+
+<!-- 加载画面 -->
+<div id="loading-screen">
+  <div class="load-text">Loading...</div>
+  <div class="load-sub">星露谷正在加载</div>
+</div>
+
+<!-- Stage 1: 办公室 -->
+<section id="stage-office" class="stage active">
+  <div class="stage-bg" style="background-image:url('assets/bg_office.png')"></div>
+  <div id="popup-container"></div>
+  <div id="sprout-bubble" class="hidden"></div>
+</section>
+
+<!-- Stage 2: 四季 -->
+<section id="stage-seasons" class="stage">
+  <div class="stage-bg" id="season-bg"></div>
+  <img class="npc-char" id="season-npc" src="" alt="王高达" />
+  <img class="item-hotspot" id="season-item" src="" alt="道具" />
+  <div id="season-indicator"><span class="arrow">◀</span> 滚轮切换季节 <span class="arrow">▶</span></div>
+</section>
+
+<!-- Stage 3: 终章 -->
+<section id="stage-ending" class="stage">
+  <div class="stage-bg" style="background-image:url('assets/bg_final.png')"></div>
+  <img class="npc-char" id="final-npc" src="assets/wang_final.png" alt="王高达" />
+  <div id="ending-hint-bubble" class="hidden">再点我一下？</div>
+</section>
+
+<!-- 物品栏 -->
+<div id="inventory-bar" class="hidden">
+  <div class="inv-slot" data-slot="0"></div>
+  <div class="inv-slot" data-slot="1"></div>
+  <div class="inv-slot" data-slot="2"></div>
+  <div class="inv-slot" data-slot="3"></div>
+</div>
+
+<!-- 对话框 -->
+<div id="dialog-overlay">
+  <div id="dialog-box">
+    <p id="dialog-text"></p>
+  </div>
+</div>
+
+<!-- 信件面板 -->
+<div id="letter-overlay">
+  <div id="letter-panel">
+    <div id="letter-content"></div>
+    <button id="letter-close-btn">折叠信纸</button>
+  </div>
+</div>
+
+<!-- 社交面板 -->
+<div id="social-overlay">
+  <div id="social-panel">
+    <h3>王高达</h3>
+    <div class="social-subtitle">AI 产品经理 / 鹈鹕镇荣誉居民</div>
+    <div class="skill-row">
+      <div class="skill-label"><span>需求分析</span><span>92%</span></div>
+      <div class="skill-bar-outer"><div class="skill-bar-inner" style="width:0%" data-width="92%"></div></div>
+    </div>
+    <div class="skill-row">
+      <div class="skill-label"><span>原型设计</span><span>85%</span></div>
+      <div class="skill-bar-outer"><div class="skill-bar-inner" style="width:0%" data-width="85%"></div></div>
+    </div>
+    <div class="skill-row">
+      <div class="skill-label"><span>数据洞察</span><span>78%</span></div>
+      <div class="skill-bar-outer"><div class="skill-bar-inner" style="width:0%" data-width="78%"></div></div>
+    </div>
+    <div class="skill-row">
+      <div class="skill-label"><span>跨团队沟通</span><span>88%</span></div>
+      <div class="skill-bar-outer"><div class="skill-bar-inner" style="width:0%" data-width="88%"></div></div>
+    </div>
+    <div class="social-links">
+      <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+      <a href="mailto:hello@example.com">Email</a>
+      <a href="#" target="_blank" rel="noopener">简历 PDF</a>
+    </div>
+    <button id="social-close-btn">关闭</button>
+  </div>
+</div>
+
+<!-- 转场遮罩 -->
+<div id="transition-overlay"></div>
+
+<!-- 存档询问 -->
+<div id="save-prompt">
+  <div class="prompt-box">
+    <p>检测到存档，是否继续上次的冒险？</p>
+    <div class="prompt-btns">
+      <button class="btn-continue" id="btn-continue">继续</button>
+      <button class="btn-restart" id="btn-restart">重新开始</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===========================================
+   Stardew Gundam — Global State Manager
+   =========================================== */
+const SAVE_KEY = 'stardew_gundam_save';
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+const SEASON_NAMES = { spring: '春', summer: '夏', autumn: '秋', winter: '冬' };
+
+const State = {
+  currentStage: 'office',
+  currentSeason: 'spring',
+  inventory: [false, false, false, false],
+  dialogueDone: { spring: false, summer: false, autumn: false, winter: false },
+  autumnClickCount: 0,
+  popupsClosed: 0,
+  letterDelivered: false,
+  letterRead: false,
+  isTyping: false // lock for typewriter
+};
+
+/* ===========================================
+   Constants — 对话 & 信件
+   =========================================== */
+const NPC_DIALOGUES = {
+  spring: '哟，被你撞见了。行吧，我摊牌——【鹈鹕镇拾荒总教头】这名字听着威风，翻译过来就是"职业翻垃圾桶的"。别人在会议室里对齐颗粒度，我在小巷子里翻外卖盒；别人年终总结写 OKR，我的年终总结是今年翻出了三把叉子两个贝壳。但说真的，好东西往往就藏在别人丢掉的地方。你往那边垃圾桶瞧瞧，好像有点什么。',
+  summer: '热死了吧？来，给你看看我的荣誉称号——【全年无休的钓鱼机器】。翻译：没有双休、没有调休、在这坐了八小时桶里还是空的。以前当社畜的时候天天盼周末，现在倒好，我自己主动周末也来。但你知道吗，我觉得这样挺好。至少鱼不会半夜钉我，湖水不会让我写周报。等待这件事本身，就已经是答案了。',
+  autumn: '……你想笑就笑吧。对，【紫色短裤鉴赏家】，你没看错。连我妈都发消息问我是不是转行做服装了。事情是这样的——村长刘易斯把他那条著名的紫色短裤落在玛妮家里了，别问我怎么知道的，问就是全镇都知道。总之，我现在是鹈鹕镇唯一一个"村长裤衩行为学"的田野调查员。说出去我自己都觉得离谱，但离谱的日子，至少不无聊。',
+  winter: '冷吧？过来烤烤。【冬日酸菜培育专家】——这名字唬人吧？真相是我春天种了一地白菜，浇水浇了大半个月，眼看能收了……换季了。一夜之间全烂地里，比我年度绩效还惨。后来想通了，烂都烂了，不如就叫它酸菜。换个名字，至少能笑着跟人介绍。那边枯草堆里好像还剩了点什么。'
+};
+
+const NPC_GREETINGS = {
+  spring: '今天翻到什么好东西没？',
+  summer: '鱼没钓着，但人晒得挺均匀。',
+  autumn: '村长今天穿的什么颜色……算了当我没问。',
+  winter: '这一季的菜，赶在换季前收了吗？'
+};
+
+const LETTERS = [
+  '孩子，今天下班的时候，你有没有抬头看看天色？爷爷种了一辈子地，最明白一件事——土地不会因为你盯着它看就长得更快。代码也不会因为你再多熬一小时就突然跑通。回家吧，洗个热水澡，晒晒太阳。你那些天大的难题，在明天的晨光里，会变得比今晚小一些。',
+  '他们说这个时代，年轻人得像永动机一样不停转动。别信。你看鹈鹕镇的冬天，万物枯萎、白雪覆盖，连最勤快的农夫都缩在火炉边打盹。可春天来了，种子照样发芽。记住：敢于停下来，也是一种了不起的勇气。你不是机器，你的疲惫值得被认真对待。',
+  '听说你最近在为一个方案焦头烂额。孩子，你知道鹈鹕镇的酿酒流为什么那么强吗？不是投入多，是发酵时间长。好果实放下去，第一年看不出什么，第二年银星，第三年金星。你的职业成长也是一样，别因为现在手里的东西不够闪亮就着急。你在扎根，别嫌慢。',
+  '我年轻时也当过牛马。在流水线上拧过螺丝，在账本前熬坏过眼睛。后来我才明白——种地也好，打工也罢，最重要不是把活干完，而是别把自己干丢了。偶尔在工位上发发呆，想想今晚想吃什么，想想周末要不要去河边走走。你首先是你自己，然后才是某家公司的某号员工。',
+  '鹈鹕镇的皮埃尔杂货店周三不开门，全镇的人都理解他。可是你周末回一条工作消息，同事们觉得天经地义。孩子，爷爷不是教你不努力，是想让你明白——你有权利守住你的边界。真正好的团队，永远容得下一个会休息的人。',
+  '上次你在电话里说觉得自己一事无成。傻孩子。我在这片土地上见过太多人了——有人追求星辰大海，有人只想守好炕头。没有谁比谁更正确。你每次踩点赶上的地铁、每个坚持练完的 demo、每一次在崩溃边缘又把自己拽回来的夜晚——这些不是什么了不起的成就，但它们是你在很认真地活着的证据。',
+  '职场上有人说你不够 aggressive，说你太安静、太温和、太不像一个"狠角色"。别理他们。爷爷告诉你一个秘密：整个星露谷最强的不是矿洞里最凶的怪物，是每天雷打不动给全村人送信的邮差。温柔而坚定地做事，不必声张，时间会替你说话的。',
+  '你攒的那些调休，什么时候才舍得用？爷爷认识的很多老人，走的时候最大的遗憾不是少赚了多少钱，是没能在身体还好的时候多去几个地方、多见几个人。孩子，你可以热爱你的工作，但别让它把你所有的清晨都变成打卡倒计时。去看看海，哪怕只是坐一下午。',
+  '被裁了？项目黄了？述职搞砸了？没关系。你知道农夫最羡慕谁吗？不是旁边那块地产量最高的邻居，是那个今年颗粒无收、明年依然笑着播种的傻子。人生不是一场绩效评估，它是一片你可以反复翻土、重新下种的土地。每一年都是第一年。',
+  '你终于走到了这里。看看你的背包——它装过深夜的泡面、通勤路上的耳机、老板画的大饼、同事推过来的锅。东西不少了，对吗？但你终究没有扔掉它，你还在走。这就是最了不起的事。接下来的路，不管往哪个方向，爷爷只想告诉你：为自己活。哪怕只是一小部分时间，也要真正为自己活。我把这座农场留给你，不是让你继续当牛马的。是让你记得——总有一个地方，你可以自由地决定今天要种什么。'
+];
+
+const ITEM_SRCS = ['assets/icon_item1.png', 'assets/icon_item2.png', 'assets/icon_item3.png', 'assets/icon_item4.png'];
+
+const SEASON_CONFIG = {
+  spring: {
+    bg: 'assets/bg_spring.png', npc: 'assets/wang_spring.png', item: 'assets/icon_item1.png',
+    npcStyle: { left: '56%' },
+    itemStyle: { left: '22%', top: '62%' }
+  },
+  summer: {
+    bg: 'assets/bg_summer.png', npc: 'assets/wang_summer.png', item: 'assets/icon_item2.png',
+    npcStyle: { left: '58%' },
+    itemStyle: { left: '68%', top: '55%' }
+  },
+  autumn: {
+    bg: 'assets/bg_autumn.png', npc: 'assets/wang_autumn.png', item: 'assets/icon_item3.png',
+    npcStyle: { left: '48%' },
+    itemStyle: { left: '35%', top: '48%' }
+  },
+  winter: {
+    bg: 'assets/bg_winter.png', npc: 'assets/wang_winter.png', item: 'assets/icon_item4.png',
+    npcStyle: { left: '42%' },
+    itemStyle: { left: '18%', top: '60%' }
+  }
+};
+
+/* ===========================================
+   Utility Functions
+   =========================================== */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+/* ===========================================
+   Save / Load
+   =========================================== */
+function saveGame() {
+  try {
+    const data = {
+      currentStage: State.currentStage,
+      currentSeason: State.currentSeason,
+      inventory: State.inventory,
+      dialogueDone: State.dialogueDone,
+      autumnClickCount: State.autumnClickCount,
+      popupsClosed: State.popupsClosed,
+      letterDelivered: State.letterDelivered,
+      letterRead: State.letterRead
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch (e) { /* quota exceeded or privacy mode, silently fail */ }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    Object.assign(State, data);
+    return true;
+  } catch (e) { return false; }
+}
+
+function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+}
+
+/* ===========================================
+   DOM element references
+   =========================================== */
+const loadingScreen = $('#loading-screen');
+const stageOffice = $('#stage-office');
+const stageSeasons = $('#stage-seasons');
+const stageEnding = $('#stage-ending');
+const seasonBg = $('#season-bg');
+const seasonNpc = $('#season-npc');
+const seasonItem = $('#season-item');
+const seasonIndicator = $('#season-indicator');
+const finalNpc = $('#final-npc');
+const endingHint = $('#ending-hint-bubble');
+const inventoryBar = $('#inventory-bar');
+const dialogOverlay = $('#dialog-overlay');
+const dialogText = $('#dialog-text');
+const letterOverlay = $('#letter-overlay');
+const letterContent = $('#letter-content');
+const socialOverlay = $('#social-overlay');
+const transitionOverlay = $('#transition-overlay');
+const savePrompt = $('#save-prompt');
+const sproutBubble = $('#sprout-bubble');
+const popupContainer = $('#popup-container');
+
+/* ===========================================
+   Loading & Initialization
+   =========================================== */
+function hideLoading() {
+  loadingScreen.classList.add('fade-out');
+  setTimeout(() => { loadingScreen.style.display = 'none'; }, 600);
+}
+
+window.addEventListener('load', () => {
+  setTimeout(hideLoading, 800);
+  const hasSave = loadGame();
+  if (hasSave) {
+    State.hasSave = true;
+    showSavePrompt();
+  } else {
+    initOffice();
+  }
+});
+
+/* ===========================================
+   Save Prompt
+   =========================================== */
+let savePromptTimeout = null;
+
+function showSavePrompt() {
+  savePrompt.classList.add('visible');
+  savePromptTimeout = setTimeout(() => {
+    closeSavePrompt(true);
+  }, 10000);
+}
+
+function closeSavePrompt(doContinue) {
+  clearTimeout(savePromptTimeout);
+  savePrompt.classList.remove('visible');
+  if (doContinue) {
+    if (State.currentStage === 'ending') {
+      restoreEndingState();
+    } else if (State.currentStage === 'seasons') {
+      restoreSeasonsState();
+    } else {
+      restoreOfficeState();
+    }
+  } else {
+    clearSave();
+    State.inventory = [false, false, false, false];
+    State.dialogueDone = { spring: false, summer: false, autumn: false, winter: false };
+    State.autumnClickCount = 0;
+    State.popupsClosed = 0;
+    State.letterDelivered = false;
+    State.letterRead = false;
+    State.currentStage = 'office';
+    State.currentSeason = 'spring';
+    initOffice();
+  }
+}
+
+$('#btn-continue').addEventListener('click', () => closeSavePrompt(true));
+$('#btn-restart').addEventListener('click', () => closeSavePrompt(false));
+
+function restoreOfficeState() {
+  switchStageEl('office');
+  inventoryBar.classList.add('hidden');
+  popupContainer.innerHTML = '';
+  sproutBubble.classList.add('hidden');
+  if (State.popupsClosed >= 3) {
+    sproutBubble.classList.remove('hidden');
+  } else {
+    // re-create already-closed popups as invisible placeholders for count
+    for (let i = 0; i < State.popupsClosed; i++) {
+      // these were already closed, skip spawning them
+    }
+    spawnRemainingPopups();
+  }
+}
+
+function restoreSeasonsState() {
+  switchStageEl('seasons');
+  inventoryBar.classList.remove('hidden');
+  renderSeason(State.currentSeason);
+  renderInventory();
+  if (checkAllCollected()) {
+    triggerEndingTransition();
+  }
+}
+
+function restoreEndingState() {
+  switchStageEl('ending');
+  inventoryBar.classList.remove('hidden');
+  renderInventory();
+  finalNpc.classList.remove('glow-hint');
+  endingHint.classList.add('hidden');
+  if (!State.letterDelivered) {
+    setTimeout(deliverItems, 600);
+  } else if (!State.letterRead) {
+    showEndingHint();
+  } else {
+    showEndingHint();
+  }
+}
+
+/* ===========================================
+   Stage Switching
+   =========================================== */
+function switchStageEl(target) {
+  [stageOffice, stageSeasons, stageEnding].forEach(s => s.classList.remove('active'));
+  if (target === 'office') stageOffice.classList.add('active');
+  else if (target === 'seasons') stageSeasons.classList.add('active');
+  else if (target === 'ending') stageEnding.classList.add('active');
+  State.currentStage = target;
+}
+
+function transitionEffect(type, callback) {
+  const ov = transitionOverlay;
+  ov.classList.remove('white-flash', 'black-fade');
+  void ov.offsetWidth; // force reflow
+  if (type === 'white') {
+    ov.classList.add('white-flash');
+    setTimeout(() => { ov.classList.remove('white-flash'); if (callback) callback(); }, 900);
+  } else if (type === 'black') {
+    ov.classList.add('black-fade');
+    setTimeout(() => { if (callback) callback(); }, 1600);
+  }
+}
+
+/* ===========================================
+   Stage 1 — 办公室
+   =========================================== */
+const POPUP_MESSAGES = [
+  { title: '🔴 紧急Bug', body: '生产环境崩溃，立刻回滚！' },
+  { title: '📋 老板的需求', body: '这个需求很简单，下班前给个方案。' },
+  { title: '📅 会议邀请', body: '下午6:00 对齐颗粒度，已重复：每天。' }
+];
+
+function initOffice() {
+  switchStageEl('office');
+  inventoryBar.classList.add('hidden');
+  sproutBubble.classList.add('hidden');
+  State.popupsClosed = 0;
+  popupContainer.innerHTML = '';
+  spawnRemainingPopups();
+}
+
+function spawnRemainingPopups() {
+  const start = State.popupsClosed;
+  for (let i = start; i < 3; i++) {
+    setTimeout(() => spawnPopup(i), (i - start) * 800 + 400);
+  }
+}
+
+function spawnPopup(index) {
+  const popup = document.createElement('div');
+  popup.className = 'alert-popup';
+  const left = rand(8, 52);
+  const top = rand(8, 40);
+  popup.style.left = left + '%';
+  popup.style.top = top + '%';
+  popup.innerHTML = `
+    <div class="popup-title">
+      <span>${POPUP_MESSAGES[index].title}</span>
+      <button class="popup-close">✕</button>
+    </div>
+    <div class="popup-body">${POPUP_MESSAGES[index].body}</div>
+  `;
+  popup.querySelector('.popup-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closePopup(popup);
+  });
+  popupContainer.appendChild(popup);
+}
+
+function closePopup(popup) {
+  popup.classList.add('shrinking');
+  popup.addEventListener('animationend', () => {
+    popup.remove();
+    State.popupsClosed++;
+    saveGame();
+    if (State.popupsClosed >= 3) {
+      showBubble();
+    }
+  }, { once: true });
+}
+
+function showBubble() {
+  sproutBubble.classList.remove('hidden');
+  sproutBubble.style.animation = 'none';
+  void sproutBubble.offsetWidth;
+  sproutBubble.style.animation = 'breathe 2s ease-in-out infinite';
+}
+
+sproutBubble.addEventListener('click', () => {
+  sproutBubble.classList.add('hidden');
+  transitionEffect('white', () => {
+    initSeasons();
+  });
+});
+
+/* ===========================================
+   Stage 2 — 四季循环
+   =========================================== */
+let wheelTimeout = null;
+let pendingSeasonDelta = null;
+
+function initSeasons() {
+  switchStageEl('seasons');
+  inventoryBar.classList.remove('hidden');
+  State.currentSeason = 'spring';
+  State.autumnClickCount = 0;
+  renderSeason(State.currentSeason);
+  renderInventory();
+  saveGame();
+}
+
+function renderSeason(season) {
+  const cfg = SEASON_CONFIG[season];
+  seasonBg.style.backgroundImage = `url('${cfg.bg}')`;
+  seasonNpc.src = cfg.npc;
+  seasonNpc.style.cssText = '';
+  Object.entries(cfg.npcStyle).forEach(([k, v]) => { seasonNpc.style[k] = v; });
+  seasonNpc.style.transition = 'opacity 0.35s ease, left 0.4s ease';
+
+  const itemIndex = SEASONS.indexOf(season);
+  if (State.inventory[itemIndex]) {
+    seasonItem.classList.add('collected');
+  } else {
+    seasonItem.classList.remove('collected');
+    seasonItem.src = cfg.item;
+    seasonItem.style.cssText = '';
+    Object.entries(cfg.itemStyle).forEach(([k, v]) => { seasonItem.style[k] = v; });
+    seasonItem.style.transition = 'opacity 0.35s ease, left 0.3s, top 0.3s, filter 0.15s, transform 0.15s';
+  }
+
+  State.currentSeason = season;
+  State.autumnClickCount = 0;
+  renderInventory();
+}
+
+function renderInventory() {
+  const slots = $$('.inv-slot');
+  slots.forEach((slot, i) => {
+    slot.innerHTML = '';
+    if (State.inventory[i]) {
+      slot.classList.add('filled');
+      const img = document.createElement('img');
+      img.src = ITEM_SRCS[i];
+      img.alt = '已收集';
+      slot.appendChild(img);
+    } else {
+      slot.classList.remove('filled');
+    }
+  });
+}
+
+function onWheel(e) {
+  if (State.currentStage !== 'seasons') return;
+  if (State.isTyping || dialogOverlay.classList.contains('visible')) return;
+  const delta = e.deltaY > 0 ? 1 : -1;
+  if (wheelTimeout) {
+    pendingSeasonDelta = delta;
+    return;
+  }
+  applySeasonChange(delta);
+  wheelTimeout = setTimeout(() => {
+    wheelTimeout = null;
+    if (pendingSeasonDelta !== null) {
+      applySeasonChange(pendingSeasonDelta);
+      pendingSeasonDelta = null;
+    }
+  }, 800);
+}
+
+function applySeasonChange(delta) {
+  const idx = SEASONS.indexOf(State.currentSeason);
+  const newIdx = (idx + delta + 4) % 4;
+  const oldSeason = State.currentSeason;
+  const newSeason = SEASONS[newIdx];
+
+  // crossfade
+  seasonBg.style.opacity = '0';
+  seasonNpc.style.opacity = '0';
+  seasonItem.style.opacity = '0';
+  seasonIndicator.style.opacity = '0';
+
+  setTimeout(() => {
+    renderSeason(newSeason);
+    seasonBg.style.opacity = '1';
+    seasonNpc.style.opacity = '1';
+    seasonItem.style.opacity = '1';
+    seasonIndicator.style.opacity = '1';
+    State.currentSeason = newSeason;
+    State.autumnClickCount = 0;
+    saveGame();
+  }, 350);
+}
+
+// Transition timings for season elements
+seasonBg.style.transition = 'opacity 0.35s ease';
+seasonNpc.style.transition = 'opacity 0.35s ease, left 0.4s ease';
+seasonItem.style.transition = 'opacity 0.35s ease, left 0.3s, top 0.3s, filter 0.15s, transform 0.15s';
+seasonIndicator.style.transition = 'opacity 0.35s';
+
+/* ===========================================
+   NPC Click (Stage 2)
+   =========================================== */
+seasonNpc.addEventListener('click', () => {
+  if (State.currentStage !== 'seasons') return;
+  if (State.isTyping) return;
+  const season = State.currentSeason;
+  if (State.dialogueDone[season]) {
+    showDialog(NPC_GREETINGS[season], null);
+  } else {
+    showDialog(NPC_DIALOGUES[season], () => {
+      State.dialogueDone[season] = true;
+      saveGame();
+    });
+  }
+});
+
+/* ===========================================
+   Item Click (Stage 2) — 含秋季捉迷藏
+   =========================================== */
+seasonItem.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (State.currentStage !== 'seasons') return;
+  if (State.isTyping) return;
+  const itemIndex = SEASONS.indexOf(State.currentSeason);
+  if (State.inventory[itemIndex]) return;
+
+  if (State.currentSeason === 'autumn') {
+    if (State.autumnClickCount === 0) {
+      // shake + teleport
+      seasonItem.classList.add('shake');
+      seasonItem.addEventListener('animationend', function h() {
+        seasonItem.classList.remove('shake');
+        seasonItem.removeEventListener('animationend', h);
+      }, { once: true });
+      teleportAutumnItem();
+      State.autumnClickCount = 1;
+      return;
+    }
+    // second click => collect
+  }
+
+  collectItem(itemIndex);
+});
+
+function teleportAutumnItem() {
+  let left, top;
+  const npcRect = seasonNpc.getBoundingClientRect();
+  const npcCX = npcRect.left + npcRect.width / 2;
+  const npcCY = npcRect.top + npcRect.height / 2;
+  // keep trying until 200px away from NPC center
+  for (let i = 0; i < 20; i++) {
+    left = rand(8, 72);
+    top = rand(12, 58);
+    const elX = (left / 100) * window.innerWidth;
+    const elY = (top / 100) * window.innerHeight;
+    const dist = Math.sqrt((elX - npcCX) ** 2 + (elY - npcCY) ** 2);
+    if (dist > 200) break;
+  }
+  seasonItem.style.left = left + '%';
+  seasonItem.style.top = top + '%';
+}
+
+function collectItem(itemIndex) {
+  const slotEl = $$('.inv-slot')[itemIndex];
+  const itemRect = seasonItem.getBoundingClientRect();
+  const slotRect = slotEl.getBoundingClientRect();
+
+  // clone flies to inventory
+  const clone = seasonItem.cloneNode(true);
+  clone.style.position = 'fixed';
+  clone.style.left = itemRect.left + 'px';
+  clone.style.top = itemRect.top + 'px';
+  clone.style.width = itemRect.width + 'px';
+  clone.style.height = itemRect.height + 'px';
+  clone.style.zIndex = '450';
+  clone.style.pointerEvents = 'none';
+  clone.style.margin = '0';
+  clone.style.maxHeight = 'none';
+  document.body.appendChild(clone);
+
+  clone.animate([
+    { left: itemRect.left + 'px', top: itemRect.top + 'px', opacity: 1, transform: 'scale(1)' },
+    { left: (slotRect.left + slotRect.width/2 - itemRect.width/2) + 'px', top: (slotRect.top + slotRect.height/2 - itemRect.height/2) + 'px', opacity: 0.5, transform: 'scale(0.3)' }
+  ], { duration: 500, easing: 'ease-in', fill: 'forwards' }).onfinish = () => clone.remove();
+
+  seasonItem.classList.add('collected');
+  State.inventory[itemIndex] = true;
+  renderInventory();
+  saveGame();
+
+  if (checkAllCollected()) {
+    setTimeout(triggerEndingTransition, 800);
+  }
+}
+
+function checkAllCollected() {
+  return State.inventory.every(Boolean);
+}
+
+function triggerEndingTransition() {
+  transitionOverlay.classList.add('black-fade');
+  setTimeout(() => {
+    transitionOverlay.classList.remove('black-fade');
+    switchStageEl('ending');
+    inventoryBar.classList.remove('hidden');
+    renderInventory();
+    setTimeout(deliverItems, 500);
+  }, 1600);
+}
+
+/* ===========================================
+   Stage 3 — 终章
+   =========================================== */
+function deliverItems() {
+  if (State.letterDelivered) return;
+  const npcRect = finalNpc.getBoundingClientRect();
+  const targetX = npcRect.left + npcRect.width / 2;
+  const targetY = npcRect.top + npcRect.height * 0.3;
+  const invSlots = $$('.inv-slot');
+
+  let completed = 0;
+  State.inventory.forEach((has, i) => {
+    if (!has) return;
+    const slotRect = invSlots[i].getBoundingClientRect();
+    const img = document.createElement('img');
+    img.src = ITEM_SRCS[i];
+    img.className = 'flying-item';
+    img.style.left = (slotRect.left + slotRect.width / 2 - 20) + 'px';
+    img.style.top = (slotRect.top + slotRect.height / 2 - 20) + 'px';
+    img.style.width = '40px';
+    document.body.appendChild(img);
+
+    img.animate([
+      { left: img.style.left, top: img.style.top, opacity: 1 },
+      { left: (targetX - 20) + 'px', top: (targetY - 20) + 'px', opacity: 0 }
+    ], { duration: 700, delay: i * 300, easing: 'ease-in', fill: 'forwards' }).onfinish = () => {
+      img.remove();
+      completed++;
+      if (completed === State.inventory.filter(Boolean).length) {
+        setTimeout(() => {
+          showDialog('谢谢你帮我找回了这些记忆。作为回报，我送你一封信吧。', () => {
+            State.letterDelivered = true;
+            saveGame();
+            // close dialog first, then show letter
+            dialogOverlay.classList.remove('visible');
+            dialogText.textContent = '';
+            currentDialogFullText = '';
+            setTimeout(showLetter, 600);
+          });
+        }, 300);
+      }
+    };
+  });
+}
+
+function showLetter() {
+  const idx = Math.floor(Math.random() * LETTERS.length);
+  letterContent.innerHTML = `<p>${LETTERS[idx]}</p><div class="letter-signature">—— 爷爷</div>`;
+  letterOverlay.classList.add('visible');
+}
+
+$('#letter-close-btn').addEventListener('click', () => {
+  letterOverlay.classList.remove('visible');
+  State.letterRead = true;
+  saveGame();
+  setTimeout(showEndingHint, 500);
+});
+
+function showEndingHint() {
+  finalNpc.classList.add('glow-hint');
+  endingHint.classList.remove('hidden');
+}
+
+/* ===========================================
+   Stage 3 — NPC Click (final-npc)
+   =========================================== */
+finalNpc.addEventListener('click', () => {
+  if (State.currentStage !== 'ending') return;
+  if (!State.letterRead) return;
+  showSocialPanel();
+});
+
+function showSocialPanel() {
+  socialOverlay.classList.add('visible');
+  // animate skill bars
+  setTimeout(() => {
+    $$('.skill-bar-inner').forEach(bar => {
+      bar.style.width = bar.dataset.width;
+    });
+  }, 200);
+  finalNpc.classList.remove('glow-hint');
+  endingHint.classList.add('hidden');
+  clearSave();
+}
+
+$('#social-close-btn').addEventListener('click', () => {
+  socialOverlay.classList.remove('visible');
+  // reset skill bars for next time
+  $$('.skill-bar-inner').forEach(bar => { bar.style.width = '0%'; });
+});
+
+/* ===========================================
+   Dialog System (Typewriter)
+   =========================================== */
+let typewriterTimer = null;
+let currentDialogFullText = '';
+let currentDialogCallback = null;
+
+function showDialog(text, onComplete) {
+  if (State.isTyping) return;
+  State.isTyping = true;
+  currentDialogFullText = text;
+  currentDialogCallback = onComplete || null;
+  dialogOverlay.classList.add('visible');
+  dialogText.textContent = '';
+  dialogText.classList.add('typing-cursor');
+
+  let i = 0;
+  const speed = 45;
+
+  function type() {
+    if (i < text.length) {
+      dialogText.textContent += text.charAt(i);
+      i++;
+      typewriterTimer = setTimeout(type, speed);
+    } else {
+      finishTypewriter();
+    }
+  }
+  type();
+}
+
+function finishTypewriter() {
+  dialogText.classList.remove('typing-cursor');
+  State.isTyping = false;
+  const cb = currentDialogCallback;
+  currentDialogCallback = null;
+  if (cb) cb();
+}
+
+function skipOrCloseDialog() {
+  if (State.isTyping) {
+    clearTimeout(typewriterTimer);
+    dialogText.textContent = currentDialogFullText;
+    finishTypewriter();
+  } else {
+    dialogOverlay.classList.remove('visible');
+    dialogText.textContent = '';
+    currentDialogFullText = '';
+  }
+}
+
+dialogOverlay.addEventListener('click', (e) => {
+  if (e.target === dialogOverlay || e.target.closest('#dialog-box')) {
+    skipOrCloseDialog();
+  }
+});
+
+/* ===========================================
+   Global Events
+   =========================================== */
+window.addEventListener('wheel', onWheel, { passive: false });
+
+// Click on stage ending (non-NPC area) to close social panel
+stageEnding.addEventListener('click', (e) => {
+  if (e.target === stageEnding || e.target.classList.contains('stage-bg')) {
+    if (socialOverlay.classList.contains('visible')) {
+      socialOverlay.classList.remove('visible');
+      $$('.skill-bar-inner').forEach(bar => { bar.style.width = '0%'; });
+    }
+  }
+});
+
+// Prevent default scroll behavior
+document.addEventListener('wheel', (e) => { e.preventDefault(); }, { passive: false });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'PageDown' || e.key === 'PageUp') {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+/* ===========================================
+   Image Error Fallback
+   =========================================== */
+document.querySelectorAll('img').forEach(img => {
+  img.addEventListener('error', () => {
+    img.style.background = '#2d1b0e';
+    img.style.minWidth = '40px';
+    img.style.minHeight = '40px';
+  });
+});
+
+// Background image fallback handled by CSS background-color on .stage-bg
+</script>
+
+</body>
+</html>
