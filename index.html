@@ -312,16 +312,29 @@ html, body {
   text-align: center; font-size: 22px; color: var(--highlight);
   margin-bottom: 6px;
 }
-#social-panel .social-subtitle { text-align: center; font-size: 13px; opacity: 0.7; margin-bottom: 20px; }
-.skill-row { margin-bottom: 12px; }
-.skill-row .skill-label { font-size: 13px; margin-bottom: 4px; display: flex; justify-content: space-between; }
-.skill-row .skill-bar-outer {
-  height: 12px; background: #1a0e04;
-  border: 2px solid #8b6914;
+#social-panel .social-subtitle { text-align: center; font-size: 13px; opacity: 0.7; margin-bottom: 24px; }
+.achievement-list { margin-bottom: 20px; }
+.achievement-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-bottom: 6px;
+  background: rgba(0,0,0,0.25);
+  border: 2px solid rgba(232,193,112,0.25);
+  border-radius: 4px;
+  animation: achieveReveal 0.5s ease-out forwards;
+  opacity: 0;
 }
-.skill-row .skill-bar-inner {
-  height: 100%; background: linear-gradient(to right, #c8a050, var(--highlight));
-  transition: width 1s ease;
+.achievement-row:nth-child(1) { animation-delay: 0.1s; }
+.achievement-row:nth-child(2) { animation-delay: 0.25s; }
+.achievement-row:nth-child(3) { animation-delay: 0.4s; }
+.achievement-row:nth-child(4) { animation-delay: 0.55s; }
+.achievement-row .season-tag {
+  font-size: 18px; flex-shrink: 0; width: 28px; text-align: center;
+}
+.achievement-row .season-label {
+  font-size: 12px; opacity: 0.6; flex-shrink: 0; width: 56px;
+}
+.achievement-row .achievement-title {
+  font-size: 14px; color: var(--highlight);
 }
 .social-links { display: flex; gap: 16px; justify-content: center; margin-top: 22px; }
 .social-links a {
@@ -438,6 +451,10 @@ html, body {
   60% { transform: translateX(-5px); }
   80% { transform: translateX(5px); }
 }
+@keyframes achieveReveal {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 </style>
 </head>
 <body>
@@ -497,22 +514,28 @@ html, body {
 <div id="social-overlay">
   <div id="social-panel">
     <h3>王高达</h3>
-    <div class="social-subtitle">AI 产品经理 / 鹈鹕镇荣誉居民</div>
-    <div class="skill-row">
-      <div class="skill-label"><span>需求分析</span><span>92%</span></div>
-      <div class="skill-bar-outer"><div class="skill-bar-inner" style="width:0%" data-width="92%"></div></div>
-    </div>
-    <div class="skill-row">
-      <div class="skill-label"><span>原型设计</span><span>85%</span></div>
-      <div class="skill-bar-outer"><div class="skill-bar-inner" style="width:0%" data-width="85%"></div></div>
-    </div>
-    <div class="skill-row">
-      <div class="skill-label"><span>数据洞察</span><span>78%</span></div>
-      <div class="skill-bar-outer"><div class="skill-bar-inner" style="width:0%" data-width="78%"></div></div>
-    </div>
-    <div class="skill-row">
-      <div class="skill-label"><span>跨团队沟通</span><span>88%</span></div>
-      <div class="skill-bar-outer"><div class="skill-bar-inner" style="width:0%" data-width="88%"></div></div>
+    <div class="social-subtitle">鹈鹕镇荣誉居民</div>
+    <div class="achievement-list">
+      <div class="achievement-row">
+        <span class="season-tag">🌸</span>
+        <span class="season-label">春季习得</span>
+        <span class="achievement-title">鹈鹕镇拾荒总教头</span>
+      </div>
+      <div class="achievement-row">
+        <span class="season-tag">☀️</span>
+        <span class="season-label">夏季习得</span>
+        <span class="achievement-title">全年无休的钓鱼机器</span>
+      </div>
+      <div class="achievement-row">
+        <span class="season-tag">🍂</span>
+        <span class="season-label">秋季习得</span>
+        <span class="achievement-title">紫色短裤鉴赏家</span>
+      </div>
+      <div class="achievement-row">
+        <span class="season-tag">❄️</span>
+        <span class="season-label">冬季习得</span>
+        <span class="achievement-title">冬日酸菜培育专家</span>
+      </div>
     </div>
     <div class="social-links">
       <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
@@ -1162,12 +1185,6 @@ finalNpc.addEventListener('click', () => {
 
 function showSocialPanel() {
   socialOverlay.classList.add('visible');
-  // animate skill bars
-  setTimeout(() => {
-    $$('.skill-bar-inner').forEach(bar => {
-      bar.style.width = bar.dataset.width;
-    });
-  }, 200);
   finalNpc.classList.remove('glow-hint');
   endingHint.classList.add('hidden');
   clearSave();
@@ -1175,8 +1192,6 @@ function showSocialPanel() {
 
 $('#social-close-btn').addEventListener('click', () => {
   socialOverlay.classList.remove('visible');
-  // reset skill bars for next time
-  $$('.skill-bar-inner').forEach(bar => { bar.style.width = '0%'; });
 });
 
 /* ===========================================
@@ -1246,7 +1261,6 @@ stageEnding.addEventListener('click', (e) => {
   if (e.target === stageEnding || e.target.classList.contains('stage-bg')) {
     if (socialOverlay.classList.contains('visible')) {
       socialOverlay.classList.remove('visible');
-      $$('.skill-bar-inner').forEach(bar => { bar.style.width = '0%'; });
     }
   }
 });
